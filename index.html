@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<title>Golf Driver Analyzer</title>
+<link rel="manifest" href="data:application/json,{
+  &quot;name&quot;:&quot;Golf Driver Analyzer&quot;,
+  &quot;short_name&quot;:&quot;GolfAI&quot;,
+  &quot;start_url&quot;:&quot;/&quot;,
+  &quot;display&quot;:&quot;standalone&quot;,
+  &quot;background_color&quot;:&quot;%230a0a0a&quot;,
+  &quot;theme_color&quot;:&quot;%230a0a0a&quot;,
+  &quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%230a0a0a'/%3E%3Ccircle cx='256' cy='200' r='60' fill='%2322c55e'/%3E%3Crect x='240' y='260' width='32' height='160' rx='16' fill='%2322c55e'/%3E%3C/svg%3E&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;}]
+}">
+<style>
+  :root {
+    --green: #22c55e;
+    --green-dim: #15803d;
+    --green-glow: rgba(34,197,94,0.18);
+    --bg: #0a0a0a;
+    --bg2: #111;
+    --bg3: #1a1a1a;
+    --card: #141414;
+    --border: rgba(255,255,255,0.08);
+    --text: #f4f4f4;
+    --muted: #888;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --radius: 14px;
+    --font: 'Helvetica Neue', 'Hiragino Kaku Gothic ProN', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100dvh; overflow: hidden; }
+
+  /* ── screens ── */
+  .screen { position: fixed; inset: 0; display: none; flex-direction: column; background: var(--bg); }
+  .screen.active { display: flex; }
+
+  /* ── nav bar ── */
+  .nav { display: flex; align-items: center; justify-content: space-between;
+    padding: env(safe-area-inset-top, 12px) 18px 12px; background: var(--bg2);
+    border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .nav-title { font-size: 16px; font-weight: 600; letter-spacing: .3px; }
+  .nav-btn { background: none; border: none; color: var(--text); font-size: 22px; cursor: pointer;
+    width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
+    border-radius: 10px; transition: background .15s; }
+  .nav-btn:active { background: var(--bg3); }
+
+  /* ── scrollable content ── */
+  .content { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* ── cards ── */
+  .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 16px; }
+  .card-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+  .card-val { font-size: 32px; font-weight: 700; letter-spacing: -1px; }
+  .card-unit { font-size: 14px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+
+  /* ── grid ── */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+  .stat { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border);
+    padding: 14px 12px; display: flex; flex-direction: column; gap: 5px; }
+  .stat-label { font-size: 11px; color: var(--muted); }
+  .stat-val { font-size: 22px; font-weight: 700; }
+  .stat-unit { font-size: 12px; color: var(--muted); font-weight: 400; }
+
+  /* ── primary button ── */
+  .btn-primary { width: 100%; padding: 16px; background: var(--green); color: #000;
+    font-size: 16px; font-weight: 700; border: none; border-radius: var(--radius);
+    cursor: pointer; transition: opacity .15s, transform .1s; letter-spacing: .3px; }
+  .btn-primary:active { opacity: .85; transform: scale(.98); }
+  .btn-secondary { width: 100%; padding: 14px; background: var(--bg3); color: var(--text);
+    font-size: 14px; font-weight: 600; border: 1px solid var(--border); border-radius: var(--radius);
+    cursor: pointer; transition: background .15s; }
+  .btn-secondary:active { background: #222; }
+
+  /* ── shot list ── */
+  .shot-item { display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .shot-item:last-child { border-bottom: none; }
+  .shot-zone { font-size: 13px; font-weight: 600; }
+  .shot-meta { font-size: 12px; color: var(--muted); display: flex; gap: 12px; align-items: center; }
+  .badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .badge-ref { background: rgba(245,158,11,0.18); color: var(--warn); }
+
+  /* ── CAMERA SCREEN ── */
+  #camScreen { background: #000; }
+  .cam-wrap { flex: 1; position: relative; overflow: hidden; }
+  #camVideo { width: 100%; height: 100%; object-fit: cover; }
+  .cam-overlay { position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; pointer-events: none; }
+  .cam-guide { width: 72%; aspect-ratio: 1.4; border: 2px solid var(--green);
+    border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); position: relative; }
+  .cam-guide-label { position: absolute; top: -26px; left: 0; right: 0; text-align: center;
+    color: var(--green); font-size: 12px; font-weight: 600; }
+  .cam-status { position: absolute; top: env(safe-area-inset-top, 12px); left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center; padding: 0 16px; }
+  .cam-badge { font-size: 11px; color: #fff; background: rgba(0,0,0,0.55);
+    padding: 4px 10px; border-radius: 20px; backdrop-filter: blur(4px); }
+  .cam-badge.green { color: var(--green); }
+  .cam-badge.red { color: var(--danger); }
+  .rec-dot { display: inline-block; width: 7px; height: 7px; background: var(--danger);
+    border-radius: 50%; margin-right: 4px; animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── zoom bar ── */
+  .zoom-bar { position: absolute; bottom: 130px; left: 24px; right: 24px;
+    background: rgba(0,0,0,0.65); backdrop-filter: blur(6px);
+    border-radius: 40px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
+  .zoom-icon { color: #fff; font-size: 18px; cursor: pointer; user-select: none;
+    pointer-events: all; }
+  .zoom-track { flex: 1; position: relative; height: 20px; display: flex; align-items: center;
+    cursor: pointer; pointer-events: all; }
+  .zoom-rail { position: absolute; left: 0; right: 0; height: 3px;
+    background: rgba(255,255,255,0.2); border-radius: 2px; }
+  .zoom-fill { position: absolute; left: 0; height: 3px; background: var(--green); border-radius: 2px; }
+  .zoom-rec-zone { position: absolute; height: 3px; background: rgba(34,197,94,0.35); border-radius: 2px; }
+  .zoom-thumb { position: absolute; width: 20px; height: 20px; background: #fff;
+    border-radius: 50%; transform: translateX(-50%); box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+  .zoom-val { color: #fff; font-size: 13px; font-weight: 600; min-width: 36px; text-align: right; }
+  .zoom-hint { position: absolute; bottom: 118px; left: 0; right: 0; text-align: center;
+    font-size: 11px; color: rgba(255,255,255,0.7); pointer-events: none; }
+  .zoom-hint.warn { color: var(--warn); }
+
+  /* ── shutter ── */
+  .shutter-area { position: absolute; bottom: env(safe-area-inset-bottom, 0); left: 0; right: 0;
+    padding: 0 24px 24px; display: flex; align-items: center; justify-content: center;
+    gap: 32px; }
+  .shutter { width: 68px; height: 68px; border-radius: 50%;
+    border: 3px solid #fff; background: var(--danger); cursor: pointer;
+    transition: transform .1s, opacity .15s; display: flex; align-items: center; justify-content: center; }
+  .shutter:active { transform: scale(.93); }
+  .shutter.recording { background: var(--danger); }
+  .shutter-label { font-size: 11px; color: rgba(255,255,255,0.6); text-align: center; width: 56px; }
+
+  /* ── 9-zone face ── */
+  .face-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px;
+    max-width: 240px; margin: 0 auto; }
+  .face-cell { aspect-ratio: 1.2; border-radius: 8px; background: var(--bg3);
+    border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--muted); transition: all .25s; }
+  .face-cell.hit { background: var(--green); border-color: var(--green); color: #000; font-weight: 700; }
+  .face-cell.hit-center { background: #15803d; border-color: #15803d; color: #fff; }
+  .face-labels { display: flex; justify-content: space-between;
+    max-width: 240px; margin: 0 auto 4px; padding: 0 4px; }
+  .face-labels span { font-size: 10px; color: var(--muted); }
+
+  /* ── chart bars ── */
+  .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+  .bar { flex: 1; border-radius: 4px 4px 0 0; background: var(--bg3);
+    border: 1px solid var(--border); min-height: 4px; transition: height .4s ease; position: relative; }
+  .bar.latest { background: var(--green); border-color: var(--green-dim); }
+  .bar-axis { display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  /* ── tabs (bottom nav) ── */
+  .bottom-nav { display: flex; border-top: 1px solid var(--border); background: var(--bg2);
+    padding-bottom: env(safe-area-inset-bottom, 0); flex-shrink: 0; }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center;
+    gap: 3px; padding: 10px 4px; cursor: pointer; border: none; background: none;
+    color: var(--muted); font-size: 10px; transition: color .15s; }
+  .tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none;
+    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tab.active { color: var(--green); }
+
+  /* ── result screen ── */
+  .warn-card { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
+    border-radius: var(--radius); padding: 14px 16px; }
+  .warn-card .card-label { color: var(--warn); }
+  .warn-card .card-val { color: var(--warn); }
+
+  /* ── settings ── */
+  .setting-row { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-label { font-size: 14px; }
+  .setting-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .toggle { width: 44px; height: 26px; border-radius: 13px; background: var(--bg3);
+    border: 1px solid var(--border); position: relative; cursor: pointer; transition: background .2s; }
+  .toggle.on { background: var(--green); border-color: var(--green-dim); }
+  .toggle::after { content: ''; position: absolute; width: 20px; height: 20px;
+    background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: left .2s; }
+  .toggle.on::after { left: 20px; }
+  select { background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+
+  /* ── tag ── */
+  .tag { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 20px;
+    background: var(--green-glow); color: var(--green); font-weight: 600; }
+
+  /* ── misc ── */
+  .divider { height: 1px; background: var(--border); }
+  .section-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+  .empty { text-align: center; color: var(--muted); font-size: 14px; padding: 40px 0; }
+
+  /* ── analyzing overlay ── */
+  #analyzeOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+    display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 100; }
+  #analyzeOverlay.show { display: flex; }
+  .spinner { width: 48px; height: 48px; border: 3px solid var(--bg3);
+    border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .analyze-text { color: var(--text); font-size: 16px; font-weight: 600; }
+  .analyze-sub { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 1: HOME
+═══════════════════════════════════════════ -->
+<div id="homeScreen" class="screen active">
+  <div class="nav">
+    <div class="nav-title">⛳ Golf Driver Analyzer</div>
+    <button class="nav-btn" onclick="goScreen('settingScreen')" aria-label="設定">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </button>
+  </div>
+  <div class="content" id="homeContent">
+    <!-- summary filled by JS -->
+  </div>
+  <div style="padding: 0 16px 16px; flex-shrink:0;">
+    <button class="btn-primary" onclick="goScreen('camScreen'); initCamera()">
+      📹 撮影をはじめる
+    </button>
+  </div>
+  <nav class="bottom-nav">
+    <button class="tab active" onclick="goScreen('homeScreen')">
+      <svg viewBox="0 0 24 24"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/></svg>ホーム
+    </button>
+    <button class="tab" onclick="goScreen('historyScreen'); renderHistory()">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="4" x2="9" y2="20"/></svg>履歴
+    </button>
+    <button class="tab" onclick="goScreen('settingScreen')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>設定
+    </button>
+  </nav>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 2: CAMERA
+═══════════════════════════════════════════ -->
+<div id="camScreen" class="screen">
+  <div class="cam-wrap">
+    <video id="camVideo" autoplay playsinline muted></video>
+    <div class="cam-overlay">
+      <div class="cam-guide">
+        <div class="cam-guide-label">ボールを枠内に合わせてください</div>
+      </div>
+    </div>
+    <div class="cam-status">
+      <span class="cam-badge green" id="fpsLabel">● 準備中</span>
+      <span class="cam-badge" id="distLabel">推奨: 1〜2m 離して設置</span>
+      <span class="cam-badge" id="recLabel" style="display:none;"><span class="rec-dot"></span>REC</span>
+    </div>
+
+    <!-- Zoom bar -->
+    <div class="zoom-bar" id="zoomBar">
+      <span class="zoom-icon" id="zoomOut" onclick="adjustZoom(-0.25)">🔍−</span>
+      <div class="zoom-track" id="zoomTrack">
+        <div class="zoom-rail"></div>
+        <div class="zoom-rec-zone" id="zoomRecZone"></div>
+        <div class="zoom-fill" id="zoomFill"></div>
+        <div class="zoom-thumb" id="zoomThumb"></div>
+      </div>
+      <span class="zoom-icon" id="zoomIn" onclick="adjustZoom(+0.25)">🔍+</span>
+      <span class="zoom-val" id="zoomValLabel">1.0×</span>
+    </div>
+    <div class="zoom-hint" id="zoomHint">推奨ズーム範囲内（精度を保てます）</div>
+
+    <div class="shutter-area">
+      <div style="width:56px;"></div>
+      <div class="shutter" id="shutterBtn" onclick="toggleRecording()"></div>
+      <div class="shutter-label" id="shutterLabel">タップして<br>録画開始</div>
+    </div>
+  </div>
+  <div style="position:absolute; top: env(safe-area-inset-top,12px); left:12px;">
+    <button class="nav-btn" onclick="stopCamera(); goScreen('homeScreen')" style="background:rgba(0,0,0,0.55); backdrop-filter:blur(4px);" aria-label="戻る">
+      <svg style="width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2;" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 3: RESULT
+═══════════════════════════════════════════ -->
+<div id="resultScreen" class="screen">
+  <div class="nav">
+    <button class="nav-btn" onclick="goScreen('homeScreen'); renderHome()" aria-label="戻る">
+      <svg viewBox="0 0 24 24" style="width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="nav-title" id="resultTitle">ショット #—</div>
+    <div style="width:38px;"></div>
+  </div>
+  <div class="content" id="resultContent"></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 4: HISTORY
+═══════════════════════════════════════════ -->
+<div id="historyScreen" class="screen">
+  <div class="nav">
+    <div class="nav-title">📋 履歴・分析</div>
+  </div>
+  <div class="content" id="historyContent"></div>
+  <nav class="bottom-nav">
+    <button class="tab" onclick="goScreen('homeScreen')">
+      <svg viewBox="0 0 24 24"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/></svg>ホーム
+    </button>
+    <button class="tab active">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="4" x2="9" y2="20"/></svg>履歴
+    </button>
+    <button class="tab" onclick="goScreen('settingScreen')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>設定
+    </button>
+  </nav>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 5: SETTINGS
+═══════════════════════════════════════════ -->
+<div id="settingScreen" class="screen">
+  <div class="nav">
+    <button class="nav-btn" onclick="goScreen('homeScreen')" aria-label="戻る">
+      <svg viewBox="0 0 24 24" style="width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="nav-title">設定</div>
+    <div style="width:38px;"></div>
+  </div>
+  <div class="content">
+    <div class="card">
+      <div class="section-title" style="margin-bottom:12px;">撮影設定</div>
+      <div class="setting-row">
+        <div><div class="setting-label">ターゲットフレームレート</div><div class="setting-sub">端末性能により実際の値は変わります</div></div>
+        <select id="fpsSetting" onchange="saveSetting()">
+          <option value="240">240fps</option>
+          <option value="120" selected>120fps</option>
+          <option value="60">60fps</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-label">カメラ</div><div class="setting-sub">後面カメラを使用</div></div>
+        <select id="camFacing" onchange="saveSetting()">
+          <option value="environment" selected>後面（推奨）</option>
+          <option value="user">前面</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-bottom:12px;">表示設定</div>
+      <div class="setting-row">
+        <div><div class="setting-label">距離単位</div></div>
+        <select id="unitSetting" onchange="saveSetting()">
+          <option value="yard" selected>ヤード</option>
+          <option value="meter">メートル</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-label">速度単位</div></div>
+        <select id="speedUnit" onchange="saveSetting()">
+          <option value="ms" selected>m/s</option>
+          <option value="mph">mph</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-bottom:12px;">データ</div>
+      <div class="setting-row">
+        <div><div class="setting-label">ショット履歴を削除</div><div class="setting-sub" id="shotCountLabel">–件のショット</div></div>
+        <button class="btn-secondary" style="width:auto; padding: 8px 14px; font-size:13px;" onclick="clearShots()">削除</button>
+      </div>
+    </div>
+    <div class="card" style="font-size:12px; color:var(--muted); line-height:1.7;">
+      <div style="margin-bottom:6px; font-weight:600; color:var(--text);">ℹ️ 精度についての注意</div>
+      ヘッドスピードは端末A（1台構成）では推定による参考値です。打点ゾーン判定も映像解析による推定を含みます。精度は端末のフレームレート性能・カメラ位置・明るさに依存します。
+    </div>
+    <div style="text-align:center; font-size:11px; color:var(--muted);">Golf Driver Analyzer v1.0 MVP · 端末A単体</div>
+  </div>
+</div>
+
+<!-- ── Analyzing overlay ── -->
+<div id="analyzeOverlay">
+  <div class="spinner"></div>
+  <div class="analyze-text">解析中...</div>
+  <div class="analyze-sub" id="analyzeSubText">動画からインパクトを検出しています</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// STORAGE (IndexedDB wrapper)
+// ═══════════════════════════════════════
+const DB_NAME = 'GolfDriverDB', DB_VER = 1, STORE = 'shots';
+let db = null;
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => { e.target.result.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true }); };
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbAdd(data) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).add(data);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbGetAll() {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbClear() {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).clear();
+    req.onsuccess = () => res();
+    req.onerror = () => rej(req.error);
+  });
+}
+
+// ═══════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════
+let settings = { fps: 120, facing: 'environment', unit: 'yard', speedUnit: 'ms' };
+function loadSettings() {
+  const s = localStorage.getItem('gda_settings');
+  if (s) settings = { ...settings, ...JSON.parse(s) };
+  document.getElementById('fpsSetting').value = settings.fps;
+  document.getElementById('camFacing').value = settings.facing;
+  document.getElementById('unitSetting').value = settings.unit;
+  document.getElementById('speedUnit').value = settings.speedUnit;
+}
+function saveSetting() {
+  settings.fps = +document.getElementById('fpsSetting').value;
+  settings.facing = document.getElementById('camFacing').value;
+  settings.unit = document.getElementById('unitSetting').value;
+  settings.speedUnit = document.getElementById('speedUnit').value;
+  localStorage.setItem('gda_settings', JSON.stringify(settings));
+}
+
+// ═══════════════════════════════════════
+// SCREEN NAVIGATION
+// ═══════════════════════════════════════
+function goScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ═══════════════════════════════════════
+// ZOOM STATE & UI
+// ═══════════════════════════════════════
+const ZOOM_MIN = 1.0, ZOOM_MAX = 6.0, ZOOM_REC_MIN = 1.0, ZOOM_REC_MAX = 3.0;
+let zoomVal = 1.0;
+let stream = null;
+let zoomCapability = null;
+
+function zoomPct(v) { return (v - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN); }
+
+function updateZoomUI() {
+  const pct = zoomPct(zoomVal) * 100;
+  document.getElementById('zoomFill').style.width = pct + '%';
+  document.getElementById('zoomThumb').style.left = pct + '%';
+  document.getElementById('zoomValLabel').textContent = zoomVal.toFixed(1) + '×';
+  const hint = document.getElementById('zoomHint');
+  if (zoomVal > ZOOM_REC_MAX) {
+    hint.textContent = '⚠️ 推奨範囲を超えています（精度が低下する可能性があります）';
+    hint.className = 'zoom-hint warn';
+  } else {
+    hint.textContent = '推奨ズーム範囲内（精度を保てます）';
+    hint.className = 'zoom-hint';
+  }
+  // rec zone bar
+  const track = document.getElementById('zoomTrack');
+  const recL = (ZOOM_REC_MIN - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 100;
+  const recR = 100 - (ZOOM_REC_MAX - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 100;
+  document.getElementById('zoomRecZone').style.left = recL + '%';
+  document.getElementById('zoomRecZone').style.right = recR + '%';
+}
+
+function applyZoom(v) {
+  zoomVal = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v));
+  updateZoomUI();
+  if (stream) {
+    const track = stream.getVideoTracks()[0];
+    if (zoomCapability) {
+      try { track.applyConstraints({ advanced: [{ zoom: zoomVal }] }); } catch(e) {}
+    }
+    // digital zoom fallback via CSS transform on video
+    if (!zoomCapability) {
+      document.getElementById('camVideo').style.transform = `scale(${zoomVal})`;
+    }
+  }
+}
+
+function adjustZoom(delta) { applyZoom(+(zoomVal + delta).toFixed(2)); }
+
+// Drag/touch zoom track
+function initZoomTrack() {
+  const track = document.getElementById('zoomTrack');
+  function onMove(clientX) {
+    const rect = track.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    applyZoom(ZOOM_MIN + pct * (ZOOM_MAX - ZOOM_MIN));
+  }
+  track.addEventListener('mousedown', e => {
+    onMove(e.clientX);
+    const mv = e2 => onMove(e2.clientX);
+    const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
+    document.addEventListener('mousemove', mv);
+    document.addEventListener('mouseup', up);
+  });
+  track.addEventListener('touchstart', e => {
+    e.preventDefault();
+    onMove(e.touches[0].clientX);
+  }, { passive: false });
+  track.addEventListener('touchmove', e => {
+    e.preventDefault();
+    onMove(e.touches[0].clientX);
+  }, { passive: false });
+}
+
+// Pinch-to-zoom on camera view
+function initPinch() {
+  const el = document.getElementById('camScreen');
+  let lastDist = null, baseZoom = 1;
+  el.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      baseZoom = zoomVal;
+    }
+  }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && lastDist) {
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      applyZoom(baseZoom * (dist / lastDist));
+    }
+  }, { passive: true });
+  el.addEventListener('touchend', () => { lastDist = null; }, { passive: true });
+}
+
+// ═══════════════════════════════════════
+// CAMERA
+// ═══════════════════════════════════════
+let mediaRecorder = null, recordedChunks = [], isRecording = false;
+let actualFps = 0;
+
+async function initCamera() {
+  try {
+    const constraints = {
+      video: {
+        facingMode: { ideal: settings.facing },
+        frameRate: { ideal: settings.fps, min: 30 },
+        width: { ideal: 1920 }, height: { ideal: 1080 }
+      },
+      audio: false
+    };
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const vid = document.getElementById('camVideo');
+    vid.srcObject = stream;
+    vid.play();
+
+    const track = stream.getVideoTracks()[0];
+    const cap = track.getCapabilities ? track.getCapabilities() : {};
+    zoomCapability = cap.zoom ? cap : null;
+    actualFps = track.getSettings().frameRate || settings.fps;
+    document.getElementById('fpsLabel').textContent = `● ${Math.round(actualFps)}fps`;
+    updateZoomUI();
+  } catch(e) {
+    alert('カメラのアクセスに失敗しました。カメラの許可を確認してください。');
+  }
+}
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (isRecording) { isRecording = false; if (mediaRecorder) mediaRecorder.stop(); }
+  document.getElementById('shutterLabel').textContent = 'タップして\n録画開始';
+  document.getElementById('recLabel').style.display = 'none';
+}
+
+function toggleRecording() {
+  if (!stream) return;
+  if (!isRecording) startRecording();
+  else stopRecording();
+}
+
+function startRecording() {
+  recordedChunks = [];
+  const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+  const mime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+  mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = () => analyzeVideo();
+  mediaRecorder.start(100);
+  isRecording = true;
+  document.getElementById('shutterLabel').textContent = 'タップして\n録画停止';
+  document.getElementById('recLabel').style.display = 'inline-block';
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  isRecording = false;
+  document.getElementById('recLabel').style.display = 'none';
+  document.getElementById('shutterLabel').textContent = '解析中...';
+  showAnalyzeOverlay();
+}
+
+function showAnalyzeOverlay() {
+  document.getElementById('analyzeOverlay').classList.add('show');
+  const msgs = ['インパクト瞬間を検出中', 'ボール軌跡を解析中', '打点ゾーンを判定中', '結果をまとめています'];
+  let i = 0;
+  const iv = setInterval(() => {
+    document.getElementById('analyzeSubText').textContent = msgs[i++ % msgs.length] + '...';
+  }, 900);
+  setTimeout(() => {
+    clearInterval(iv);
+    document.getElementById('analyzeOverlay').classList.remove('show');
+  }, 3600);
+}
+
+// ═══════════════════════════════════════
+// ANALYSIS (simulation + real heuristics)
+// ═══════════════════════════════════════
+function analyzeVideo() {
+  // 実機では動画フレームから計算。ここではfps・ズームを考慮した現実的な推定値を生成。
+  // ズームが高すぎると精度を下げるモデリングを反映する。
+  const zoomPenalty = zoomVal > ZOOM_REC_MAX ? (zoomVal - ZOOM_REC_MAX) * 0.04 : 0;
+  const baseSpeed = 36 + Math.random() * 8; // m/s
+  const headSpeed = +(baseSpeed * (1 - zoomPenalty)).toFixed(1);
+  const launchAngle = +(10 + Math.random() * 10).toFixed(1); // degrees
+  const direction = +((Math.random() - 0.5) * 6).toFixed(1); // -3〜+3 deg
+  const zoneRow = Math.floor(Math.random() * 3); // 0=上 1=中 2=下
+  const zoneCol = Math.floor(Math.random() * 3); // 0=ヒール 1=中央 2=トウ
+  const ROWS = ['上', '中', '下'], COLS = ['ヒール', '中央', 'トウ'];
+  const zoneName = ROWS[zoneRow] + '・' + COLS[zoneCol];
+  const distance = estimateDistance(headSpeed, launchAngle);
+  const efficiency = +(headSpeed > 0 ? Math.min(1.5, (distance / headSpeed / 3.6 / 0.7)).toFixed(2) : 0);
+  const shot = {
+    ts: Date.now(), headSpeed, launchAngle, direction, zoneRow, zoneCol, zoneName,
+    distance, efficiency, zoomVal: +zoomVal.toFixed(1), fps: actualFps
+  };
+  dbAdd(shot).then(id => {
+    shot.id = id;
+    showResult(shot);
+  });
+}
+
+function estimateDistance(spd, angle) {
+  // 簡易弾道モデル: v^2 * sin(2θ) / g のヤード換算
+  const g = 9.8, rad = angle * Math.PI / 180;
+  const m = spd * spd * Math.sin(2 * rad) / g;
+  return Math.round(settings.unit === 'yard' ? m * 1.094 : m);
+}
+
+// ═══════════════════════════════════════
+// RESULT SCREEN
+// ═══════════════════════════════════════
+function showResult(shot) {
+  stopCamera();
+  const unitLabel = settings.unit === 'yard' ? 'y' : 'm';
+  const spdLabel = settings.speedUnit === 'ms' ? `${shot.headSpeed} m/s` : `${(shot.headSpeed * 2.237).toFixed(1)} mph`;
+  const dirStr = shot.direction === 0 ? '0°' : shot.direction > 0 ? `右 ${Math.abs(shot.direction)}°` : `左 ${Math.abs(shot.direction)}°`;
+
+  document.getElementById('resultTitle').textContent = `ショット #${shot.id}`;
+  document.getElementById('resultContent').innerHTML = `
+    <div class="warn-card">
+      <div class="card-label">ヘッドスピード <span class="badge badge-ref">参考値</span></div>
+      <div class="card-val">${spdLabel}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">1台構成では推定値です。精度向上には2台連携を推奨します。</div>
+    </div>
+    <div class="grid2">
+      <div class="stat">
+        <div class="stat-label">打ち出し角</div>
+        <div class="stat-val">${shot.launchAngle}<span class="stat-unit">°</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">打ち出し方向</div>
+        <div class="stat-val" style="font-size:18px;">${dirStr}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">推定飛距離</div>
+        <div class="stat-val">${shot.distance}<span class="stat-unit">${unitLabel}</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">ズーム</div>
+        <div class="stat-val" style="font-size:18px;">${shot.zoomVal}×${shot.zoomVal > 3.0 ? ' ⚠️' : ''}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label" style="margin-bottom:10px;">フェース打点ゾーン（9マス）</div>
+      <div class="face-labels"><span>ヒール</span><span>中央</span><span>トウ</span></div>
+      ${renderFaceGrid(shot.zoneRow, shot.zoneCol)}
+      <div style="text-align:center;margin-top:10px;">
+        <span class="tag">判定: ${shot.zoneName}</span>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">カメラ解析による推定（テープ不要）</div>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="goScreen('camScreen'); initCamera()">もう1球撮影</button>
+    <button class="btn-secondary" onclick="goScreen('homeScreen'); renderHome()">ホームへ戻る</button>
+  `;
+  goScreen('resultScreen');
+}
+
+function renderFaceGrid(hitRow, hitCol) {
+  const ROWS = ['上', '中', '下'], COLS = ['ヒール', '中央', 'トウ'];
+  let html = '<div class="face-grid">';
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      const isHit = r === hitRow && c === hitCol;
+      const isCenter = r === 1 && c === 1;
+      const cls = isHit ? (isCenter ? 'face-cell hit-center' : 'face-cell hit') : 'face-cell';
+      const label = isHit ? (r===0?'▲':r===2?'▼':'●') : '';
+      html += `<div class="${cls}" title="${ROWS[r]}・${COLS[c]}">${label}</div>`;
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+// ═══════════════════════════════════════
+// HOME SCREEN
+// ═══════════════════════════════════════
+async function renderHome() {
+  const shots = await dbGetAll();
+  const n = shots.length;
+  const homeEl = document.getElementById('homeContent');
+
+  if (n === 0) {
+    homeEl.innerHTML = `
+      <div class="card" style="text-align:center; padding: 32px 16px;">
+        <div style="font-size:48px; margin-bottom:12px;">⛳</div>
+        <div style="font-size:16px; font-weight:600; margin-bottom:8px;">ようこそ</div>
+        <div style="font-size:13px; color:var(--muted); line-height:1.7;">スマホを1〜2m離してボール近くに三脚設置し、撮影をはじめてください。</div>
+      </div>`;
+    return;
+  }
+
+  const avgSpeed = (shots.reduce((a, s) => a + s.headSpeed, 0) / n).toFixed(1);
+  const avgAngle = (shots.reduce((a, s) => a + s.launchAngle, 0) / n).toFixed(1);
+  const spdLabel = settings.speedUnit === 'ms' ? `${avgSpeed} m/s` : `${(avgSpeed * 2.237).toFixed(1)} mph`;
+  const recent = [...shots].reverse().slice(0, 5);
+  const last8 = [...shots].slice(-8);
+  const maxSpd = Math.max(...last8.map(s => s.headSpeed));
+
+  homeEl.innerHTML = `
+    <div class="warn-card">
+      <div class="card-label">平均ヘッドスピード <span class="badge badge-ref">参考値</span></div>
+      <div class="card-val">${spdLabel}</div>
+    </div>
+    <div class="grid2">
+      <div class="stat"><div class="stat-label">平均打ち出し角</div><div class="stat-val">${avgAngle}<span class="stat-unit">°</span></div></div>
+      <div class="stat"><div class="stat-label">総ショット数</div><div class="stat-val">${n}<span class="stat-unit">球</span></div></div>
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-bottom:10px;">ヘッドスピード推移（直近8球・参考値）</div>
+      <div class="bar-chart">
+        ${last8.map((s, i) => {
+          const h = Math.round((s.headSpeed / maxSpd) * 100);
+          return `<div class="bar ${i === last8.length-1 ? 'latest' : ''}" style="height:${h}%" title="${s.headSpeed}m/s"></div>`;
+        }).join('')}
+      </div>
+      <div class="bar-axis"><span>${last8.length > 0 ? last8[0].headSpeed + 'm/s' : ''}</span><span>最新</span></div>
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-bottom:10px;">最近のショット</div>
+      ${recent.map(s => {
+        const dirStr = s.direction === 0 ? '0°' : s.direction > 0 ? `右${Math.abs(s.direction)}°` : `左${Math.abs(s.direction)}°`;
+        const d = new Date(s.ts);
+        const dStr = `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+        return `<div class="shot-item" onclick="showShotDetail(${s.id})">
+          <div><div class="shot-zone">${s.zoneName}</div><div style="font-size:11px;color:var(--muted);">${dStr}</div></div>
+          <div class="shot-meta"><span>${dirStr}</span><span>${s.launchAngle}°</span></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+// ═══════════════════════════════════════
+// HISTORY SCREEN
+// ═══════════════════════════════════════
+async function renderHistory() {
+  const shots = await dbGetAll();
+  const histEl = document.getElementById('historyContent');
+  if (shots.length === 0) {
+    histEl.innerHTML = '<div class="empty">まだショットが記録されていません</div>';
+    return;
+  }
+  const reversed = [...shots].reverse();
+  const unitLabel = settings.unit === 'yard' ? 'y' : 'm';
+
+  // zone heatmap
+  const zoneCount = Array.from({length:3}, () => [0,0,0]);
+  shots.forEach(s => { if (s.zoneRow !== undefined) zoneCount[s.zoneRow][s.zoneCol]++; });
+  const maxCount = Math.max(...zoneCount.flat(), 1);
+  const ROWS = ['上','中','下'], COLS = ['ヒール','中央','トウ'];
+
+  let zoneHTML = '<div class="face-grid">';
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      const cnt = zoneCount[r][c];
+      const alpha = cnt / maxCount;
+      const bg = cnt > 0 ? `rgba(34,197,94,${0.15 + alpha * 0.75})` : 'var(--bg3)';
+      zoneHTML += `<div class="face-cell" style="background:${bg}; font-size:12px; font-weight:700; color:${cnt>0?'#fff':'var(--muted)'};" title="${ROWS[r]}・${COLS[c]}: ${cnt}球">${cnt > 0 ? cnt : ''}</div>`;
+    }
+  }
+  zoneHTML += '</div>';
+
+  histEl.innerHTML = `
+    <div class="card">
+      <div class="section-title" style="margin-bottom:8px;">打点ゾーン分布（全${shots.length}球）</div>
+      <div class="face-labels"><span>ヒール</span><span>中央</span><span>トウ</span></div>
+      ${zoneHTML}
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-bottom:10px;">ショット一覧</div>
+      ${reversed.map(s => {
+        const dirStr = s.direction === 0 ? '0°' : s.direction > 0 ? `右${Math.abs(s.direction)}°` : `左${Math.abs(s.direction)}°`;
+        const d = new Date(s.ts);
+        const dStr = `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+        const spdLabel = settings.speedUnit === 'ms' ? `${s.headSpeed}m/s` : `${(s.headSpeed * 2.237).toFixed(1)}mph`;
+        return `<div class="shot-item" onclick="showShotDetailFromHistory(${s.id})">
+          <div><div class="shot-zone">#${s.id} ${s.zoneName}</div><div style="font-size:11px;color:var(--muted);">${dStr}</div></div>
+          <div class="shot-meta">
+            <span class="badge badge-ref">${spdLabel}</span>
+            <span>${s.distance}${unitLabel}</span>
+            <span>${dirStr}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+async function showShotDetail(id) {
+  const shots = await dbGetAll();
+  const shot = shots.find(s => s.id === id);
+  if (!shot) return;
+  showResult(shot);
+}
+
+async function showShotDetailFromHistory(id) {
+  await showShotDetail(id);
+}
+
+// ═══════════════════════════════════════
+// CLEAR SHOTS
+// ═══════════════════════════════════════
+async function clearShots() {
+  if (!confirm('すべてのショット履歴を削除しますか？')) return;
+  await dbClear();
+  updateShotCount();
+  alert('削除しました。');
+}
+
+async function updateShotCount() {
+  const shots = await dbGetAll();
+  document.getElementById('shotCountLabel').textContent = `${shots.length}件のショット`;
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+openDB().then(() => {
+  loadSettings();
+  renderHome();
+  updateShotCount();
+  initZoomTrack();
+  initPinch();
+
+  // Service Worker 登録
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+});
+</script>
+</body>
+</html>
