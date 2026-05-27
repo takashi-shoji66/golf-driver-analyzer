@@ -1,887 +1,550 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0a0a0a">
-<title>Golf Driver Analyzer</title>
-<link rel="manifest" href="data:application/json,{
-  &quot;name&quot;:&quot;Golf Driver Analyzer&quot;,
-  &quot;short_name&quot;:&quot;GolfAI&quot;,
-  &quot;start_url&quot;:&quot;/&quot;,
-  &quot;display&quot;:&quot;standalone&quot;,
-  &quot;background_color&quot;:&quot;%230a0a0a&quot;,
-  &quot;theme_color&quot;:&quot;%230a0a0a&quot;,
-  &quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%230a0a0a'/%3E%3Ccircle cx='256' cy='200' r='60' fill='%2322c55e'/%3E%3Crect x='240' y='260' width='32' height='160' rx='16' fill='%2322c55e'/%3E%3C/svg%3E&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;}]
-}">
-<style>
-  :root {
-    --green: #22c55e;
-    --green-dim: #15803d;
-    --green-glow: rgba(34,197,94,0.18);
-    --bg: #0a0a0a;
-    --bg2: #111;
-    --bg3: #1a1a1a;
-    --card: #141414;
-    --border: rgba(255,255,255,0.08);
-    --text: #f4f4f4;
-    --muted: #888;
-    --warn: #f59e0b;
-    --danger: #ef4444;
-    --radius: 14px;
-    --font: 'Helvetica Neue', 'Hiragino Kaku Gothic ProN', sans-serif;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100dvh; overflow: hidden; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Golf Driver Analyzer - PWAスイング分析</title>
+  <meta name="description" content="ボール近接カメラ撮影でヘッドスピード(参考)、打点9マス、打ち出し角・方向を完全ローカルで精密解析。">
+  
+  <!-- PWA Settings -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Driver Analyzer">
+  <meta name="theme-color" content="#080c0a">
 
-  /* ── screens ── */
-  .screen { position: fixed; inset: 0; display: none; flex-direction: column; background: var(--bg); }
-  .screen.active { display: flex; }
+  <!-- Google Fonts for Digital Look and Modern UI -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- App Style -->
+  <link rel="stylesheet" href="style.css">
 
-  /* ── nav bar ── */
-  .nav { display: flex; align-items: center; justify-content: space-between;
-    padding: env(safe-area-inset-top, 12px) 18px 12px; background: var(--bg2);
-    border-bottom: 1px solid var(--border); flex-shrink: 0; }
-  .nav-title { font-size: 16px; font-weight: 600; letter-spacing: .3px; }
-  .nav-btn { background: none; border: none; color: var(--text); font-size: 22px; cursor: pointer;
-    width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
-    border-radius: 10px; transition: background .15s; }
-  .nav-btn:active { background: var(--bg3); }
-
-  /* ── scrollable content ── */
-  .content { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-
-  /* ── cards ── */
-  .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 16px; }
-  .card-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
-  .card-val { font-size: 32px; font-weight: 700; letter-spacing: -1px; }
-  .card-unit { font-size: 14px; font-weight: 400; color: var(--muted); margin-left: 4px; }
-
-  /* ── grid ── */
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-
-  .stat { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border);
-    padding: 14px 12px; display: flex; flex-direction: column; gap: 5px; }
-  .stat-label { font-size: 11px; color: var(--muted); }
-  .stat-val { font-size: 22px; font-weight: 700; }
-  .stat-unit { font-size: 12px; color: var(--muted); font-weight: 400; }
-
-  /* ── primary button ── */
-  .btn-primary { width: 100%; padding: 16px; background: var(--green); color: #000;
-    font-size: 16px; font-weight: 700; border: none; border-radius: var(--radius);
-    cursor: pointer; transition: opacity .15s, transform .1s; letter-spacing: .3px; }
-  .btn-primary:active { opacity: .85; transform: scale(.98); }
-  .btn-secondary { width: 100%; padding: 14px; background: var(--bg3); color: var(--text);
-    font-size: 14px; font-weight: 600; border: 1px solid var(--border); border-radius: var(--radius);
-    cursor: pointer; transition: background .15s; }
-  .btn-secondary:active { background: #222; }
-
-  /* ── shot list ── */
-  .shot-item { display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
-  .shot-item:last-child { border-bottom: none; }
-  .shot-zone { font-size: 13px; font-weight: 600; }
-  .shot-meta { font-size: 12px; color: var(--muted); display: flex; gap: 12px; align-items: center; }
-  .badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
-  .badge-ref { background: rgba(245,158,11,0.18); color: var(--warn); }
-
-  /* ── CAMERA SCREEN ── */
-  #camScreen { background: #000; }
-  .cam-wrap { flex: 1; position: relative; overflow: hidden; }
-  #camVideo { width: 100%; height: 100%; object-fit: cover; }
-  .cam-overlay { position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; pointer-events: none; }
-  .cam-guide { width: 72%; aspect-ratio: 1.4; border: 2px solid var(--green);
-    border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); position: relative; }
-  .cam-guide-label { position: absolute; top: -26px; left: 0; right: 0; text-align: center;
-    color: var(--green); font-size: 12px; font-weight: 600; }
-  .cam-status { position: absolute; top: env(safe-area-inset-top, 12px); left: 0; right: 0;
-    display: flex; justify-content: space-between; align-items: center; padding: 0 16px; }
-  .cam-badge { font-size: 11px; color: #fff; background: rgba(0,0,0,0.55);
-    padding: 4px 10px; border-radius: 20px; backdrop-filter: blur(4px); }
-  .cam-badge.green { color: var(--green); }
-  .cam-badge.red { color: var(--danger); }
-  .rec-dot { display: inline-block; width: 7px; height: 7px; background: var(--danger);
-    border-radius: 50%; margin-right: 4px; animation: blink 1s infinite; }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-
-  /* ── zoom bar ── */
-  .zoom-bar { position: absolute; bottom: 130px; left: 24px; right: 24px;
-    background: rgba(0,0,0,0.65); backdrop-filter: blur(6px);
-    border-radius: 40px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
-  .zoom-icon { color: #fff; font-size: 18px; cursor: pointer; user-select: none;
-    pointer-events: all; }
-  .zoom-track { flex: 1; position: relative; height: 20px; display: flex; align-items: center;
-    cursor: pointer; pointer-events: all; }
-  .zoom-rail { position: absolute; left: 0; right: 0; height: 3px;
-    background: rgba(255,255,255,0.2); border-radius: 2px; }
-  .zoom-fill { position: absolute; left: 0; height: 3px; background: var(--green); border-radius: 2px; }
-  .zoom-rec-zone { position: absolute; height: 3px; background: rgba(34,197,94,0.35); border-radius: 2px; }
-  .zoom-thumb { position: absolute; width: 20px; height: 20px; background: #fff;
-    border-radius: 50%; transform: translateX(-50%); box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
-  .zoom-val { color: #fff; font-size: 13px; font-weight: 600; min-width: 36px; text-align: right; }
-  .zoom-hint { position: absolute; bottom: 118px; left: 0; right: 0; text-align: center;
-    font-size: 11px; color: rgba(255,255,255,0.7); pointer-events: none; }
-  .zoom-hint.warn { color: var(--warn); }
-
-  /* ── shutter ── */
-  .shutter-area { position: absolute; bottom: env(safe-area-inset-bottom, 0); left: 0; right: 0;
-    padding: 0 24px 24px; display: flex; align-items: center; justify-content: center;
-    gap: 32px; }
-  .shutter { width: 68px; height: 68px; border-radius: 50%;
-    border: 3px solid #fff; background: var(--danger); cursor: pointer;
-    transition: transform .1s, opacity .15s; display: flex; align-items: center; justify-content: center; }
-  .shutter:active { transform: scale(.93); }
-  .shutter.recording { background: var(--danger); }
-  .shutter-label { font-size: 11px; color: rgba(255,255,255,0.6); text-align: center; width: 56px; }
-
-  /* ── 9-zone face ── */
-  .face-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px;
-    max-width: 240px; margin: 0 auto; }
-  .face-cell { aspect-ratio: 1.2; border-radius: 8px; background: var(--bg3);
-    border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center;
-    font-size: 10px; color: var(--muted); transition: all .25s; }
-  .face-cell.hit { background: var(--green); border-color: var(--green); color: #000; font-weight: 700; }
-  .face-cell.hit-center { background: #15803d; border-color: #15803d; color: #fff; }
-  .face-labels { display: flex; justify-content: space-between;
-    max-width: 240px; margin: 0 auto 4px; padding: 0 4px; }
-  .face-labels span { font-size: 10px; color: var(--muted); }
-
-  /* ── chart bars ── */
-  .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
-  .bar { flex: 1; border-radius: 4px 4px 0 0; background: var(--bg3);
-    border: 1px solid var(--border); min-height: 4px; transition: height .4s ease; position: relative; }
-  .bar.latest { background: var(--green); border-color: var(--green-dim); }
-  .bar-axis { display: flex; justify-content: space-between;
-    font-size: 10px; color: var(--muted); margin-top: 4px; }
-
-  /* ── tabs (bottom nav) ── */
-  .bottom-nav { display: flex; border-top: 1px solid var(--border); background: var(--bg2);
-    padding-bottom: env(safe-area-inset-bottom, 0); flex-shrink: 0; }
-  .tab { flex: 1; display: flex; flex-direction: column; align-items: center;
-    gap: 3px; padding: 10px 4px; cursor: pointer; border: none; background: none;
-    color: var(--muted); font-size: 10px; transition: color .15s; }
-  .tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none;
-    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .tab.active { color: var(--green); }
-
-  /* ── result screen ── */
-  .warn-card { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
-    border-radius: var(--radius); padding: 14px 16px; }
-  .warn-card .card-label { color: var(--warn); }
-  .warn-card .card-val { color: var(--warn); }
-
-  /* ── settings ── */
-  .setting-row { display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 0; border-bottom: 1px solid var(--border); }
-  .setting-row:last-child { border-bottom: none; }
-  .setting-label { font-size: 14px; }
-  .setting-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .toggle { width: 44px; height: 26px; border-radius: 13px; background: var(--bg3);
-    border: 1px solid var(--border); position: relative; cursor: pointer; transition: background .2s; }
-  .toggle.on { background: var(--green); border-color: var(--green-dim); }
-  .toggle::after { content: ''; position: absolute; width: 20px; height: 20px;
-    background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: left .2s; }
-  .toggle.on::after { left: 20px; }
-  select { background: var(--bg3); color: var(--text); border: 1px solid var(--border);
-    border-radius: 8px; padding: 6px 10px; font-size: 13px; }
-
-  /* ── tag ── */
-  .tag { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 20px;
-    background: var(--green-glow); color: var(--green); font-weight: 600; }
-
-  /* ── misc ── */
-  .divider { height: 1px; background: var(--border); }
-  .section-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
-  .empty { text-align: center; color: var(--muted); font-size: 14px; padding: 40px 0; }
-
-  /* ── analyzing overlay ── */
-  #analyzeOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88);
-    display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 100; }
-  #analyzeOverlay.show { display: flex; }
-  .spinner { width: 48px; height: 48px; border: 3px solid var(--bg3);
-    border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .analyze-text { color: var(--text); font-size: 16px; font-weight: 600; }
-  .analyze-sub { color: var(--muted); font-size: 13px; }
-</style>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+  <!-- Background subtle glow effects -->
+  <div class="bg-glow"></div>
+  <div class="bg-glow-accent"></div>
 
-<!-- ══════════════════════════════════════════
-     SCREEN 1: HOME
-═══════════════════════════════════════════ -->
-<div id="homeScreen" class="screen active">
-  <div class="nav">
-    <div class="nav-title">⛳ Golf Driver Analyzer</div>
-    <button class="nav-btn" onclick="goScreen('settingScreen')" aria-label="設定">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-    </button>
-  </div>
-  <div class="content" id="homeContent">
-    <!-- summary filled by JS -->
-  </div>
-  <div style="padding: 0 16px 16px; flex-shrink:0;">
-    <button class="btn-primary" onclick="goScreen('camScreen'); initCamera()">
-      📹 撮影をはじめる
-    </button>
-  </div>
-  <nav class="bottom-nav">
-    <button class="tab active" onclick="goScreen('homeScreen')">
-      <svg viewBox="0 0 24 24"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/></svg>ホーム
-    </button>
-    <button class="tab" onclick="goScreen('historyScreen'); renderHistory()">
-      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="4" x2="9" y2="20"/></svg>履歴
-    </button>
-    <button class="tab" onclick="goScreen('settingScreen')">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>設定
-    </button>
-  </nav>
-</div>
-
-<!-- ══════════════════════════════════════════
-     SCREEN 2: CAMERA
-═══════════════════════════════════════════ -->
-<div id="camScreen" class="screen">
-  <div class="cam-wrap">
-    <video id="camVideo" autoplay playsinline muted></video>
-    <div class="cam-overlay">
-      <div class="cam-guide">
-        <div class="cam-guide-label">ボールを枠内に合わせてください</div>
+  <div class="app-container">
+    <!-- Header Area -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo">
+          <i class="fa-solid fa-golf-ball-tee"></i>
+        </div>
+        <div class="brand-text">
+          <h1>GOLF DRIVER ANALYZER <span class="version-badge">v1.3-MVP</span></h1>
+          <span class="subtitle">BALL-APPROXIMATION IMPACT DIAGNOSTIC SYSTEM</span>
+        </div>
       </div>
-    </div>
-    <div class="cam-status">
-      <span class="cam-badge green" id="fpsLabel">● 準備中</span>
-      <span class="cam-badge" id="distLabel">推奨: 1〜2m 離して設置</span>
-      <span class="cam-badge" id="recLabel" style="display:none;"><span class="rec-dot"></span>REC</span>
-    </div>
-
-    <!-- Zoom bar -->
-    <div class="zoom-bar" id="zoomBar">
-      <span class="zoom-icon" id="zoomOut" onclick="adjustZoom(-0.25)">🔍−</span>
-      <div class="zoom-track" id="zoomTrack">
-        <div class="zoom-rail"></div>
-        <div class="zoom-rec-zone" id="zoomRecZone"></div>
-        <div class="zoom-fill" id="zoomFill"></div>
-        <div class="zoom-thumb" id="zoomThumb"></div>
+      <div class="header-metadata">
+        <span class="meta-item author">BY: ShoG & Antigravity</span>
+        <span class="meta-item date">2026/05/28</span>
       </div>
-      <span class="zoom-icon" id="zoomIn" onclick="adjustZoom(+0.25)">🔍+</span>
-      <span class="zoom-val" id="zoomValLabel">1.0×</span>
-    </div>
-    <div class="zoom-hint" id="zoomHint">推奨ズーム範囲内（精度を保てます）</div>
+    </header>
 
-    <div class="shutter-area">
-      <div style="width:56px;"></div>
-      <div class="shutter" id="shutterBtn" onclick="toggleRecording()"></div>
-      <div class="shutter-label" id="shutterLabel">タップして<br>録画開始</div>
-    </div>
-  </div>
-  <div style="position:absolute; top: env(safe-area-inset-top,12px); left:12px;">
-    <button class="nav-btn" onclick="stopCamera(); goScreen('homeScreen')" style="background:rgba(0,0,0,0.55); backdrop-filter:blur(4px);" aria-label="戻る">
-      <svg style="width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2;" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-    </button>
-  </div>
-</div>
+    <!-- Main Views Container (SPA Panels) -->
+    <div class="views-wrapper">
+      
+      <!-- ① HOME PANEL -->
+      <section id="panel-home" class="app-panel active">
+        <div class="welcome-box">
+          <h2><i class="fa-solid fa-circle-play"></i> スイング計測を始めましょう</h2>
+          <p>ボールの至近距離（1〜2m離れた真横）にスマホを設置し、インパクトと打ち出し挙動を自動計測します。</p>
+          <button class="action-btn-large btn-trigger-capture" onclick="switchPanel('capture')">
+            <i class="fa-solid fa-camera-retro"></i> 計測を開始する
+          </button>
+        </div>
 
-<!-- ══════════════════════════════════════════
-     SCREEN 3: RESULT
-═══════════════════════════════════════════ -->
-<div id="resultScreen" class="screen">
-  <div class="nav">
-    <button class="nav-btn" onclick="goScreen('homeScreen'); renderHome()" aria-label="戻る">
-      <svg viewBox="0 0 24 24" style="width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-    </button>
-    <div class="nav-title" id="resultTitle">ショット #—</div>
-    <div style="width:38px;"></div>
-  </div>
-  <div class="content" id="resultContent"></div>
-</div>
-
-<!-- ══════════════════════════════════════════
-     SCREEN 4: HISTORY
-═══════════════════════════════════════════ -->
-<div id="historyScreen" class="screen">
-  <div class="nav">
-    <div class="nav-title">📋 履歴・分析</div>
-  </div>
-  <div class="content" id="historyContent"></div>
-  <nav class="bottom-nav">
-    <button class="tab" onclick="goScreen('homeScreen')">
-      <svg viewBox="0 0 24 24"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/></svg>ホーム
-    </button>
-    <button class="tab active">
-      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="4" x2="9" y2="20"/></svg>履歴
-    </button>
-    <button class="tab" onclick="goScreen('settingScreen')">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>設定
-    </button>
-  </nav>
-</div>
-
-<!-- ══════════════════════════════════════════
-     SCREEN 5: SETTINGS
-═══════════════════════════════════════════ -->
-<div id="settingScreen" class="screen">
-  <div class="nav">
-    <button class="nav-btn" onclick="goScreen('homeScreen')" aria-label="戻る">
-      <svg viewBox="0 0 24 24" style="width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-    </button>
-    <div class="nav-title">設定</div>
-    <div style="width:38px;"></div>
-  </div>
-  <div class="content">
-    <div class="card">
-      <div class="section-title" style="margin-bottom:12px;">撮影設定</div>
-      <div class="setting-row">
-        <div><div class="setting-label">ターゲットフレームレート</div><div class="setting-sub">端末性能により実際の値は変わります</div></div>
-        <select id="fpsSetting" onchange="saveSetting()">
-          <option value="240">240fps</option>
-          <option value="120" selected>120fps</option>
-          <option value="60">60fps</option>
-        </select>
-      </div>
-      <div class="setting-row">
-        <div><div class="setting-label">カメラ</div><div class="setting-sub">後面カメラを使用</div></div>
-        <select id="camFacing" onchange="saveSetting()">
-          <option value="environment" selected>後面（推奨）</option>
-          <option value="user">前面</option>
-        </select>
-      </div>
-    </div>
-    <div class="card">
-      <div class="section-title" style="margin-bottom:12px;">表示設定</div>
-      <div class="setting-row">
-        <div><div class="setting-label">距離単位</div></div>
-        <select id="unitSetting" onchange="saveSetting()">
-          <option value="yard" selected>ヤード</option>
-          <option value="meter">メートル</option>
-        </select>
-      </div>
-      <div class="setting-row">
-        <div><div class="setting-label">速度単位</div></div>
-        <select id="speedUnit" onchange="saveSetting()">
-          <option value="ms" selected>m/s</option>
-          <option value="mph">mph</option>
-        </select>
-      </div>
-    </div>
-    <div class="card">
-      <div class="section-title" style="margin-bottom:12px;">データ</div>
-      <div class="setting-row">
-        <div><div class="setting-label">ショット履歴を削除</div><div class="setting-sub" id="shotCountLabel">–件のショット</div></div>
-        <button class="btn-secondary" style="width:auto; padding: 8px 14px; font-size:13px;" onclick="clearShots()">削除</button>
-      </div>
-    </div>
-    <div class="card" style="font-size:12px; color:var(--muted); line-height:1.7;">
-      <div style="margin-bottom:6px; font-weight:600; color:var(--text);">ℹ️ 精度についての注意</div>
-      ヘッドスピードは端末A（1台構成）では推定による参考値です。打点ゾーン判定も映像解析による推定を含みます。精度は端末のフレームレート性能・カメラ位置・明るさに依存します。
-    </div>
-    <div style="text-align:center; font-size:11px; color:var(--muted);">Golf Driver Analyzer v1.0 MVP · 端末A単体</div>
-  </div>
-</div>
-
-<!-- ── Analyzing overlay ── -->
-<div id="analyzeOverlay">
-  <div class="spinner"></div>
-  <div class="analyze-text">解析中...</div>
-  <div class="analyze-sub" id="analyzeSubText">動画からインパクトを検出しています</div>
-</div>
-
-<script>
-// ═══════════════════════════════════════
-// STORAGE (IndexedDB wrapper)
-// ═══════════════════════════════════════
-const DB_NAME = 'GolfDriverDB', DB_VER = 1, STORE = 'shots';
-let db = null;
-
-function openDB() {
-  return new Promise((res, rej) => {
-    const req = indexedDB.open(DB_NAME, DB_VER);
-    req.onupgradeneeded = e => { e.target.result.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true }); };
-    req.onsuccess = e => { db = e.target.result; res(db); };
-    req.onerror = () => rej(req.error);
-  });
-}
-function dbAdd(data) {
-  return new Promise((res, rej) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    const req = tx.objectStore(STORE).add(data);
-    req.onsuccess = () => res(req.result);
-    req.onerror = () => rej(req.error);
-  });
-}
-function dbGetAll() {
-  return new Promise((res, rej) => {
-    const tx = db.transaction(STORE, 'readonly');
-    const req = tx.objectStore(STORE).getAll();
-    req.onsuccess = () => res(req.result);
-    req.onerror = () => rej(req.error);
-  });
-}
-function dbClear() {
-  return new Promise((res, rej) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    const req = tx.objectStore(STORE).clear();
-    req.onsuccess = () => res();
-    req.onerror = () => rej(req.error);
-  });
-}
-
-// ═══════════════════════════════════════
-// SETTINGS
-// ═══════════════════════════════════════
-let settings = { fps: 120, facing: 'environment', unit: 'yard', speedUnit: 'ms' };
-function loadSettings() {
-  const s = localStorage.getItem('gda_settings');
-  if (s) settings = { ...settings, ...JSON.parse(s) };
-  document.getElementById('fpsSetting').value = settings.fps;
-  document.getElementById('camFacing').value = settings.facing;
-  document.getElementById('unitSetting').value = settings.unit;
-  document.getElementById('speedUnit').value = settings.speedUnit;
-}
-function saveSetting() {
-  settings.fps = +document.getElementById('fpsSetting').value;
-  settings.facing = document.getElementById('camFacing').value;
-  settings.unit = document.getElementById('unitSetting').value;
-  settings.speedUnit = document.getElementById('speedUnit').value;
-  localStorage.setItem('gda_settings', JSON.stringify(settings));
-}
-
-// ═══════════════════════════════════════
-// SCREEN NAVIGATION
-// ═══════════════════════════════════════
-function goScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-
-// ═══════════════════════════════════════
-// ZOOM STATE & UI
-// ═══════════════════════════════════════
-const ZOOM_MIN = 1.0, ZOOM_MAX = 6.0, ZOOM_REC_MIN = 1.0, ZOOM_REC_MAX = 3.0;
-let zoomVal = 1.0;
-let stream = null;
-let zoomCapability = null;
-
-function zoomPct(v) { return (v - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN); }
-
-function updateZoomUI() {
-  const pct = zoomPct(zoomVal) * 100;
-  document.getElementById('zoomFill').style.width = pct + '%';
-  document.getElementById('zoomThumb').style.left = pct + '%';
-  document.getElementById('zoomValLabel').textContent = zoomVal.toFixed(1) + '×';
-  const hint = document.getElementById('zoomHint');
-  if (zoomVal > ZOOM_REC_MAX) {
-    hint.textContent = '⚠️ 推奨範囲を超えています（精度が低下する可能性があります）';
-    hint.className = 'zoom-hint warn';
-  } else {
-    hint.textContent = '推奨ズーム範囲内（精度を保てます）';
-    hint.className = 'zoom-hint';
-  }
-  // rec zone bar
-  const track = document.getElementById('zoomTrack');
-  const recL = (ZOOM_REC_MIN - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 100;
-  const recR = 100 - (ZOOM_REC_MAX - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 100;
-  document.getElementById('zoomRecZone').style.left = recL + '%';
-  document.getElementById('zoomRecZone').style.right = recR + '%';
-}
-
-function applyZoom(v) {
-  zoomVal = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v));
-  updateZoomUI();
-  if (stream) {
-    const track = stream.getVideoTracks()[0];
-    if (zoomCapability) {
-      try { track.applyConstraints({ advanced: [{ zoom: zoomVal }] }); } catch(e) {}
-    }
-    // digital zoom fallback via CSS transform on video
-    if (!zoomCapability) {
-      document.getElementById('camVideo').style.transform = `scale(${zoomVal})`;
-    }
-  }
-}
-
-function adjustZoom(delta) { applyZoom(+(zoomVal + delta).toFixed(2)); }
-
-// Drag/touch zoom track
-function initZoomTrack() {
-  const track = document.getElementById('zoomTrack');
-  function onMove(clientX) {
-    const rect = track.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    applyZoom(ZOOM_MIN + pct * (ZOOM_MAX - ZOOM_MIN));
-  }
-  track.addEventListener('mousedown', e => {
-    onMove(e.clientX);
-    const mv = e2 => onMove(e2.clientX);
-    const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
-    document.addEventListener('mousemove', mv);
-    document.addEventListener('mouseup', up);
-  });
-  track.addEventListener('touchstart', e => {
-    e.preventDefault();
-    onMove(e.touches[0].clientX);
-  }, { passive: false });
-  track.addEventListener('touchmove', e => {
-    e.preventDefault();
-    onMove(e.touches[0].clientX);
-  }, { passive: false });
-}
-
-// Pinch-to-zoom on camera view
-function initPinch() {
-  const el = document.getElementById('camScreen');
-  let lastDist = null, baseZoom = 1;
-  el.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
-      lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      baseZoom = zoomVal;
-    }
-  }, { passive: true });
-  el.addEventListener('touchmove', e => {
-    if (e.touches.length === 2 && lastDist) {
-      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      applyZoom(baseZoom * (dist / lastDist));
-    }
-  }, { passive: true });
-  el.addEventListener('touchend', () => { lastDist = null; }, { passive: true });
-}
-
-// ═══════════════════════════════════════
-// CAMERA
-// ═══════════════════════════════════════
-let mediaRecorder = null, recordedChunks = [], isRecording = false;
-let actualFps = 0;
-
-async function initCamera() {
-  try {
-    const constraints = {
-      video: {
-        facingMode: { ideal: settings.facing },
-        frameRate: { ideal: settings.fps, min: 30 },
-        width: { ideal: 1920 }, height: { ideal: 1080 }
-      },
-      audio: false
-    };
-    stream = await navigator.mediaDevices.getUserMedia(constraints);
-    const vid = document.getElementById('camVideo');
-    vid.srcObject = stream;
-    vid.play();
-
-    const track = stream.getVideoTracks()[0];
-    const cap = track.getCapabilities ? track.getCapabilities() : {};
-    zoomCapability = cap.zoom ? cap : null;
-    actualFps = track.getSettings().frameRate || settings.fps;
-    document.getElementById('fpsLabel').textContent = `● ${Math.round(actualFps)}fps`;
-    updateZoomUI();
-  } catch(e) {
-    alert('カメラのアクセスに失敗しました。カメラの許可を確認してください。');
-  }
-}
-
-function stopCamera() {
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  if (isRecording) { isRecording = false; if (mediaRecorder) mediaRecorder.stop(); }
-  document.getElementById('shutterLabel').textContent = 'タップして\n録画開始';
-  document.getElementById('recLabel').style.display = 'none';
-}
-
-function toggleRecording() {
-  if (!stream) return;
-  if (!isRecording) startRecording();
-  else stopRecording();
-}
-
-function startRecording() {
-  recordedChunks = [];
-  const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
-  const mime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
-  mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
-  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
-  mediaRecorder.onstop = () => analyzeVideo();
-  mediaRecorder.start(100);
-  isRecording = true;
-  document.getElementById('shutterLabel').textContent = 'タップして\n録画停止';
-  document.getElementById('recLabel').style.display = 'inline-block';
-}
-
-function stopRecording() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-  isRecording = false;
-  document.getElementById('recLabel').style.display = 'none';
-  document.getElementById('shutterLabel').textContent = '解析中...';
-  showAnalyzeOverlay();
-}
-
-function showAnalyzeOverlay() {
-  document.getElementById('analyzeOverlay').classList.add('show');
-  const msgs = ['インパクト瞬間を検出中', 'ボール軌跡を解析中', '打点ゾーンを判定中', '結果をまとめています'];
-  let i = 0;
-  const iv = setInterval(() => {
-    document.getElementById('analyzeSubText').textContent = msgs[i++ % msgs.length] + '...';
-  }, 900);
-  setTimeout(() => {
-    clearInterval(iv);
-    document.getElementById('analyzeOverlay').classList.remove('show');
-  }, 3600);
-}
-
-// ═══════════════════════════════════════
-// ANALYSIS (simulation + real heuristics)
-// ═══════════════════════════════════════
-function analyzeVideo() {
-  // 実機では動画フレームから計算。ここではfps・ズームを考慮した現実的な推定値を生成。
-  // ズームが高すぎると精度を下げるモデリングを反映する。
-  const zoomPenalty = zoomVal > ZOOM_REC_MAX ? (zoomVal - ZOOM_REC_MAX) * 0.04 : 0;
-  const baseSpeed = 36 + Math.random() * 8; // m/s
-  const headSpeed = +(baseSpeed * (1 - zoomPenalty)).toFixed(1);
-  const launchAngle = +(10 + Math.random() * 10).toFixed(1); // degrees
-  const direction = +((Math.random() - 0.5) * 6).toFixed(1); // -3〜+3 deg
-  const zoneRow = Math.floor(Math.random() * 3); // 0=上 1=中 2=下
-  const zoneCol = Math.floor(Math.random() * 3); // 0=ヒール 1=中央 2=トウ
-  const ROWS = ['上', '中', '下'], COLS = ['ヒール', '中央', 'トウ'];
-  const zoneName = ROWS[zoneRow] + '・' + COLS[zoneCol];
-  const distance = estimateDistance(headSpeed, launchAngle);
-  const efficiency = +(headSpeed > 0 ? Math.min(1.5, (distance / headSpeed / 3.6 / 0.7)).toFixed(2) : 0);
-  const shot = {
-    ts: Date.now(), headSpeed, launchAngle, direction, zoneRow, zoneCol, zoneName,
-    distance, efficiency, zoomVal: +zoomVal.toFixed(1), fps: actualFps
-  };
-  dbAdd(shot).then(id => {
-    shot.id = id;
-    showResult(shot);
-  });
-}
-
-function estimateDistance(spd, angle) {
-  // 簡易弾道モデル: v^2 * sin(2θ) / g のヤード換算
-  const g = 9.8, rad = angle * Math.PI / 180;
-  const m = spd * spd * Math.sin(2 * rad) / g;
-  return Math.round(settings.unit === 'yard' ? m * 1.094 : m);
-}
-
-// ═══════════════════════════════════════
-// RESULT SCREEN
-// ═══════════════════════════════════════
-function showResult(shot) {
-  stopCamera();
-  const unitLabel = settings.unit === 'yard' ? 'y' : 'm';
-  const spdLabel = settings.speedUnit === 'ms' ? `${shot.headSpeed} m/s` : `${(shot.headSpeed * 2.237).toFixed(1)} mph`;
-  const dirStr = shot.direction === 0 ? '0°' : shot.direction > 0 ? `右 ${Math.abs(shot.direction)}°` : `左 ${Math.abs(shot.direction)}°`;
-
-  document.getElementById('resultTitle').textContent = `ショット #${shot.id}`;
-  document.getElementById('resultContent').innerHTML = `
-    <div class="warn-card">
-      <div class="card-label">ヘッドスピード <span class="badge badge-ref">参考値</span></div>
-      <div class="card-val">${spdLabel}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px;">1台構成では推定値です。精度向上には2台連携を推奨します。</div>
-    </div>
-    <div class="grid2">
-      <div class="stat">
-        <div class="stat-label">打ち出し角</div>
-        <div class="stat-val">${shot.launchAngle}<span class="stat-unit">°</span></div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">打ち出し方向</div>
-        <div class="stat-val" style="font-size:18px;">${dirStr}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">推定飛距離</div>
-        <div class="stat-val">${shot.distance}<span class="stat-unit">${unitLabel}</span></div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">ズーム</div>
-        <div class="stat-val" style="font-size:18px;">${shot.zoomVal}×${shot.zoomVal > 3.0 ? ' ⚠️' : ''}</div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-label" style="margin-bottom:10px;">フェース打点ゾーン（9マス）</div>
-      <div class="face-labels"><span>ヒール</span><span>中央</span><span>トウ</span></div>
-      ${renderFaceGrid(shot.zoneRow, shot.zoneCol)}
-      <div style="text-align:center;margin-top:10px;">
-        <span class="tag">判定: ${shot.zoneName}</span>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px;">カメラ解析による推定（テープ不要）</div>
-      </div>
-    </div>
-    <button class="btn-primary" onclick="goScreen('camScreen'); initCamera()">もう1球撮影</button>
-    <button class="btn-secondary" onclick="goScreen('homeScreen'); renderHome()">ホームへ戻る</button>
-  `;
-  goScreen('resultScreen');
-}
-
-function renderFaceGrid(hitRow, hitCol) {
-  const ROWS = ['上', '中', '下'], COLS = ['ヒール', '中央', 'トウ'];
-  let html = '<div class="face-grid">';
-  for (let r = 0; r < 3; r++) {
-    for (let c = 0; c < 3; c++) {
-      const isHit = r === hitRow && c === hitCol;
-      const isCenter = r === 1 && c === 1;
-      const cls = isHit ? (isCenter ? 'face-cell hit-center' : 'face-cell hit') : 'face-cell';
-      const label = isHit ? (r===0?'▲':r===2?'▼':'●') : '';
-      html += `<div class="${cls}" title="${ROWS[r]}・${COLS[c]}">${label}</div>`;
-    }
-  }
-  html += '</div>';
-  return html;
-}
-
-// ═══════════════════════════════════════
-// HOME SCREEN
-// ═══════════════════════════════════════
-async function renderHome() {
-  const shots = await dbGetAll();
-  const n = shots.length;
-  const homeEl = document.getElementById('homeContent');
-
-  if (n === 0) {
-    homeEl.innerHTML = `
-      <div class="card" style="text-align:center; padding: 32px 16px;">
-        <div style="font-size:48px; margin-bottom:12px;">⛳</div>
-        <div style="font-size:16px; font-weight:600; margin-bottom:8px;">ようこそ</div>
-        <div style="font-size:13px; color:var(--muted); line-height:1.7;">スマホを1〜2m離してボール近くに三脚設置し、撮影をはじめてください。</div>
-      </div>`;
-    return;
-  }
-
-  const avgSpeed = (shots.reduce((a, s) => a + s.headSpeed, 0) / n).toFixed(1);
-  const avgAngle = (shots.reduce((a, s) => a + s.launchAngle, 0) / n).toFixed(1);
-  const spdLabel = settings.speedUnit === 'ms' ? `${avgSpeed} m/s` : `${(avgSpeed * 2.237).toFixed(1)} mph`;
-  const recent = [...shots].reverse().slice(0, 5);
-  const last8 = [...shots].slice(-8);
-  const maxSpd = Math.max(...last8.map(s => s.headSpeed));
-
-  homeEl.innerHTML = `
-    <div class="warn-card">
-      <div class="card-label">平均ヘッドスピード <span class="badge badge-ref">参考値</span></div>
-      <div class="card-val">${spdLabel}</div>
-    </div>
-    <div class="grid2">
-      <div class="stat"><div class="stat-label">平均打ち出し角</div><div class="stat-val">${avgAngle}<span class="stat-unit">°</span></div></div>
-      <div class="stat"><div class="stat-label">総ショット数</div><div class="stat-val">${n}<span class="stat-unit">球</span></div></div>
-    </div>
-    <div class="card">
-      <div class="section-title" style="margin-bottom:10px;">ヘッドスピード推移（直近8球・参考値）</div>
-      <div class="bar-chart">
-        ${last8.map((s, i) => {
-          const h = Math.round((s.headSpeed / maxSpd) * 100);
-          return `<div class="bar ${i === last8.length-1 ? 'latest' : ''}" style="height:${h}%" title="${s.headSpeed}m/s"></div>`;
-        }).join('')}
-      </div>
-      <div class="bar-axis"><span>${last8.length > 0 ? last8[0].headSpeed + 'm/s' : ''}</span><span>最新</span></div>
-    </div>
-    <div class="card">
-      <div class="section-title" style="margin-bottom:10px;">最近のショット</div>
-      ${recent.map(s => {
-        const dirStr = s.direction === 0 ? '0°' : s.direction > 0 ? `右${Math.abs(s.direction)}°` : `左${Math.abs(s.direction)}°`;
-        const d = new Date(s.ts);
-        const dStr = `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
-        return `<div class="shot-item" onclick="showShotDetail(${s.id})">
-          <div><div class="shot-zone">${s.zoneName}</div><div style="font-size:11px;color:var(--muted);">${dStr}</div></div>
-          <div class="shot-meta"><span>${dirStr}</span><span>${s.launchAngle}°</span></div>
-        </div>`;
-      }).join('')}
-    </div>`;
-}
-
-// ═══════════════════════════════════════
-// HISTORY SCREEN
-// ═══════════════════════════════════════
-async function renderHistory() {
-  const shots = await dbGetAll();
-  const histEl = document.getElementById('historyContent');
-  if (shots.length === 0) {
-    histEl.innerHTML = '<div class="empty">まだショットが記録されていません</div>';
-    return;
-  }
-  const reversed = [...shots].reverse();
-  const unitLabel = settings.unit === 'yard' ? 'y' : 'm';
-
-  // zone heatmap
-  const zoneCount = Array.from({length:3}, () => [0,0,0]);
-  shots.forEach(s => { if (s.zoneRow !== undefined) zoneCount[s.zoneRow][s.zoneCol]++; });
-  const maxCount = Math.max(...zoneCount.flat(), 1);
-  const ROWS = ['上','中','下'], COLS = ['ヒール','中央','トウ'];
-
-  let zoneHTML = '<div class="face-grid">';
-  for (let r = 0; r < 3; r++) {
-    for (let c = 0; c < 3; c++) {
-      const cnt = zoneCount[r][c];
-      const alpha = cnt / maxCount;
-      const bg = cnt > 0 ? `rgba(34,197,94,${0.15 + alpha * 0.75})` : 'var(--bg3)';
-      zoneHTML += `<div class="face-cell" style="background:${bg}; font-size:12px; font-weight:700; color:${cnt>0?'#fff':'var(--muted)'};" title="${ROWS[r]}・${COLS[c]}: ${cnt}球">${cnt > 0 ? cnt : ''}</div>`;
-    }
-  }
-  zoneHTML += '</div>';
-
-  histEl.innerHTML = `
-    <div class="card">
-      <div class="section-title" style="margin-bottom:8px;">打点ゾーン分布（全${shots.length}球）</div>
-      <div class="face-labels"><span>ヒール</span><span>中央</span><span>トウ</span></div>
-      ${zoneHTML}
-    </div>
-    <div class="card">
-      <div class="section-title" style="margin-bottom:10px;">ショット一覧</div>
-      ${reversed.map(s => {
-        const dirStr = s.direction === 0 ? '0°' : s.direction > 0 ? `右${Math.abs(s.direction)}°` : `左${Math.abs(s.direction)}°`;
-        const d = new Date(s.ts);
-        const dStr = `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
-        const spdLabel = settings.speedUnit === 'ms' ? `${s.headSpeed}m/s` : `${(s.headSpeed * 2.237).toFixed(1)}mph`;
-        return `<div class="shot-item" onclick="showShotDetailFromHistory(${s.id})">
-          <div><div class="shot-zone">#${s.id} ${s.zoneName}</div><div style="font-size:11px;color:var(--muted);">${dStr}</div></div>
-          <div class="shot-meta">
-            <span class="badge badge-ref">${spdLabel}</span>
-            <span>${s.distance}${unitLabel}</span>
-            <span>${dirStr}</span>
+        <div class="dashboard-row">
+          <!-- Average Stats Summary Card -->
+          <div class="card stat-summary-card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-calculator"></i> 直近平均データ</h3>
+            </div>
+            <div class="card-body">
+              <div class="stats-summary-grid">
+                <div class="summary-item">
+                  <span class="sum-lbl">平均ヘッドスピード</span>
+                  <span class="sum-val" id="avg-hs">-- <small>m/s</small></span>
+                </div>
+                <div class="summary-item">
+                  <span class="sum-lbl">平均ミート率</span>
+                  <span class="sum-val" id="avg-smash">--</span>
+                </div>
+                <div class="summary-item">
+                  <span class="sum-lbl">平均打ち出し角</span>
+                  <span class="sum-val" id="avg-angle">--°</span>
+                </div>
+                <div class="summary-item">
+                  <span class="sum-lbl">平均飛距離</span>
+                  <span class="sum-val" id="avg-dist">-- <small>yd</small></span>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>`;
-      }).join('')}
-    </div>`;
-}
+        </div>
 
-async function showShotDetail(id) {
-  const shots = await dbGetAll();
-  const shot = shots.find(s => s.id === id);
-  if (!shot) return;
-  showResult(shot);
-}
+        <!-- Recent Shots Card -->
+        <div class="card recent-shots-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-list-check"></i> 最近のショット履歴</h3>
+            <button class="text-link-btn" onclick="switchPanel('history')">すべて見る</button>
+          </div>
+          <div class="card-body">
+            <div class="recent-list" id="home-recent-list">
+              <!-- JS dynamically populates -->
+              <div class="empty-state">
+                <i class="fa-solid fa-folder-open"></i>
+                <p>まだショット履歴がありません。最初の計測を行いましょう！</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-async function showShotDetailFromHistory(id) {
-  await showShotDetail(id);
-}
+      <!-- ② CAPTURE PANEL -->
+      <section id="panel-capture" class="app-panel">
+        <div class="card capture-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-camera"></i> インパクト撮影カメラ</h3>
+            <span class="safety-badge"><i class="fa-solid fa-shield-halved"></i> 安全距離: 1〜2m推奨</span>
+          </div>
+          <div class="card-body no-padding">
+            <div class="camera-viewport-container">
+              <!-- Safety Overlay Alert Message -->
+              <div class="safety-warning-banner">
+                <i class="fa-solid fa-triangle-exclamation"></i> スイング軌道から離して設置してください (破損防止)
+              </div>
 
-// ═══════════════════════════════════════
-// CLEAR SHOTS
-// ═══════════════════════════════════════
-async function clearShots() {
-  if (!confirm('すべてのショット履歴を削除しますか？')) return;
-  await dbClear();
-  updateShotCount();
-  alert('削除しました。');
-}
+              <!-- Camera View and Guide Overlay -->
+              <div class="video-container-raw">
+                <video id="camera-stream" playsinline autoplay muted></video>
+                <div class="alignment-guide">
+                  <div class="guide-circle" title="ボールをここに合わせてください"></div>
+                  <div class="guide-crosshair-h"></div>
+                  <div class="guide-crosshair-v"></div>
+                  <span class="guide-label">ボール合わせ位置</span>
+                </div>
+                
+                <!-- Recording Status Overlay -->
+                <div id="capture-rec-status" class="capture-overlay-rec hidden">
+                  <span class="rec-dot animate-blink"></span> REC
+                  <span id="capture-rec-timer">00:00</span>
+                </div>
 
-async function updateShotCount() {
-  const shots = await dbGetAll();
-  document.getElementById('shotCountLabel').textContent = `${shots.length}件のショット`;
-}
+                <!-- Sound Trigger Active Status Indicator -->
+                <div id="sound-trigger-badge" class="sound-badge-active hidden">
+                  <i class="fa-solid fa-microphone-lines neon-blink"></i> 音声トリガー待機中
+                </div>
 
-// ═══════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════
-openDB().then(() => {
-  loadSettings();
-  renderHome();
-  updateShotCount();
-  initZoomTrack();
-  initPinch();
+                <!-- Countdown Overlay -->
+                <div id="capture-countdown" class="capture-countdown hidden">
+                  <span id="capture-countdown-num">5</span>
+                </div>
+              </div>
 
-  // Service Worker 登録
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  }
-});
-</script>
+              <!-- Zoom Controls overlay -->
+              <div class="zoom-overlay-controls">
+                <span class="zoom-label">ズーム</span>
+                <input type="range" id="zoom-slider" min="1" max="4" step="0.1" value="1" class="zoom-slider">
+                <div class="zoom-ticks">
+                  <span class="tick active">1.0x</span>
+                  <span class="tick">2.0x (推奨最大)</span>
+                  <span class="tick warning">4.0x (デジタル)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Controls layout -->
+            <div class="capture-controls-panel">
+              <div class="control-row-group">
+                <div class="selector-group">
+                  <label for="camera-device-select"><i class="fa-solid fa-video"></i> デバイス</label>
+                  <select id="camera-device-select" class="custom-select select-medium"></select>
+                </div>
+                <div class="selector-group">
+                  <label for="capture-timer"><i class="fa-solid fa-clock"></i> セルフタイマー</label>
+                  <select id="capture-timer" class="custom-select select-small">
+                    <option value="0">即時</option>
+                    <option value="3">3秒</option>
+                    <option value="5" selected>5秒</option>
+                    <option value="10">10秒</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="control-row-group">
+                <!-- Sound Trigger Toggle -->
+                <label class="toggle-switch-container">
+                  <input type="checkbox" id="chk-sound-trigger" checked>
+                  <span class="switch-slider"></span>
+                  <span class="switch-label"><i class="fa-solid fa-microphone"></i> 音声トリガー録画 (打球音検知)</span>
+                </label>
+              </div>
+
+              <div class="capture-action-row">
+                <!-- Upload button -->
+                <div class="upload-file-button-wrapper">
+                  <button class="btn-sec-rect" onclick="document.getElementById('video-file-picker').click()">
+                    <i class="fa-solid fa-file-arrow-up"></i> 動画ファイル解析
+                  </button>
+                  <input type="file" id="video-file-picker" accept="video/*" class="hidden">
+                </div>
+
+                <!-- Record trigger -->
+                <button id="btn-trigger-record" class="btn-record-main">
+                  <div class="inner-circle"></div>
+                </button>
+
+                <!-- Demo Mode loader -->
+                <button class="btn-sec-rect btn-glow-neon" id="btn-load-demo">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> デモ動画でテスト
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ③ RESULT PANEL -->
+      <section id="panel-result" class="app-panel">
+        <div class="result-layout-grid">
+          <!-- Video Player card -->
+          <div class="card player-card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-play-css"></i> インパクト動画再生</h3>
+              
+              <!-- RAW/OVERLAY Toggle switch -->
+              <div class="video-overlay-toggle-container">
+                <span class="toggle-mode-label">元動画</span>
+                <label class="toggle-switch-container small">
+                  <input type="checkbox" id="chk-video-overlay" checked>
+                  <span class="switch-slider"></span>
+                </label>
+                <span class="toggle-mode-label active">解析オーバーレイ</span>
+              </div>
+            </div>
+            <div class="card-body no-padding">
+              <div class="player-wrapper">
+                <video id="result-video" playsinline webkit-playsinline preload="auto" class="hidden"></video>
+                <canvas id="result-canvas"></canvas>
+                
+                <!-- Loading overlay -->
+                <div id="result-processing" class="result-processing-loader hidden">
+                  <div class="spinner-small"></div>
+                  <span>動画フレーム解析中...</span>
+                </div>
+              </div>
+              
+              <!-- Video controls bar -->
+              <div class="video-controls-bar">
+                <div class="range-timeline-wrapper">
+                  <input type="range" id="result-slider" min="0" max="100" value="0" step="0.1" class="timeline-slider">
+                  <div class="timeline-markers" id="result-timeline-markers"></div>
+                </div>
+                <div class="player-buttons-row">
+                  <div class="play-btn-col">
+                    <button id="btn-result-play" class="control-btn-icon" title="再生"><i class="fa-solid fa-play"></i></button>
+                    <button id="btn-result-prev" class="control-btn-icon btn-sec" title="コマ戻し"><i class="fa-solid fa-step-backward"></i></button>
+                    <button id="btn-result-next" class="control-btn-icon btn-sec" title="コマ送り"><i class="fa-solid fa-step-forward"></i></button>
+                    <span id="result-time" class="time-display">0.00 / 0.00s</span>
+                  </div>
+                  <div class="speed-btn-col">
+                    <button class="speed-btn active" data-rspeed="1">1.0x</button>
+                    <button class="speed-btn" data-rspeed="0.5">0.5x</button>
+                    <button class="speed-btn" data-rspeed="0.25">0.25x</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Diagnostic dashboard -->
+          <div class="card result-dashboard-card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-square-poll-vertical"></i> 計測パラメータ</h3>
+              <span class="reference-note">※HS・飛距離等は推定参考値</span>
+            </div>
+            <div class="card-body">
+              <div class="meters-dashboard-grid">
+                <div class="metric-meter-box">
+                  <span class="met-title">ヘッドスピード <span class="ref-star">*</span></span>
+                  <span class="met-value" id="res-hs">-- <small>m/s</small></span>
+                  <span class="met-status" id="res-hs-status">--</span>
+                </div>
+                <div class="metric-meter-box">
+                  <span class="met-title">ミート率 (インパクト効率) <span class="ref-star">*</span></span>
+                  <span class="met-value" id="res-smash">--</span>
+                  <span class="met-status" id="res-smash-status">--</span>
+                </div>
+                <div class="metric-meter-box">
+                  <span class="met-title">打ち出し垂直角</span>
+                  <span class="met-value" id="res-vangle">--°</span>
+                  <span class="met-status" id="res-vangle-status">--</span>
+                </div>
+                <div class="metric-meter-box">
+                  <span class="met-title">打ち出し水平角</span>
+                  <span class="met-value" id="res-hangle">--°</span>
+                  <span class="met-status" id="res-hangle-status">--</span>
+                </div>
+              </div>
+
+              <!-- Carry details -->
+              <div class="carry-display-container">
+                <span class="carry-title">推定飛距離 <span class="ref-star">*</span></span>
+                <div class="carry-number-row">
+                  <span class="carry-value" id="res-distance">--</span>
+                  <span class="carry-unit" id="res-distance-unit">yd</span>
+                </div>
+              </div>
+
+              <!-- 2D Ballistic trajectory canvas -->
+              <div class="trajectory-sim-container">
+                <span class="sim-label"><i class="fa-solid fa-wind"></i> 推定弾道シミュレーター</span>
+                <canvas id="trajectory-canvas" width="400" height="100"></canvas>
+              </div>
+
+              <!-- Action buttons to impact analysis screen -->
+              <div class="result-navigation-row">
+                <button class="action-btn-large btn-impact-next" onclick="switchPanel('impact')">
+                  打点ゾーン判定画面へ進む <i class="fa-solid fa-arrow-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ④ IMPACT PANEL -->
+      <section id="panel-impact" class="app-panel">
+        <div class="impact-layout-grid">
+          <!-- Clubface 9-zone display card -->
+          <div class="card face-display-card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-bullseye"></i> フェース打点判定</h3>
+              <label class="toggle-switch-container small">
+                <input type="checkbox" id="chk-tape-mode">
+                <span class="switch-slider"></span>
+                <span class="switch-label label-inline">インパクトテープ併用</span>
+              </label>
+            </div>
+            <div class="card-body">
+              <p class="impact-guide">
+                自動解析された打点がハイライトされています。ズレている場合やインパクトテープで打痕を確認した場合は、<strong>9マスのフェース面を直接タップして手動補正</strong>してください。
+              </p>
+              
+              <!-- 9-Zone Clubface grid UI -->
+              <div class="clubface-visualizer-container" id="clubface-container">
+                <div class="clubface-graphic-bg"></div>
+                <div class="grid-9-zones" id="impact-9-grid">
+                  <div class="grid-cell" data-zone="toe-top"><span>上・トウ</span></div>
+                  <div class="grid-cell" data-zone="center-top"><span>上・中央</span></div>
+                  <div class="grid-cell" data-zone="heel-top"><span>上・ヒール</span></div>
+                  
+                  <div class="grid-cell" data-zone="toe-mid"><span>中・トウ</span></div>
+                  <div class="grid-cell" data-zone="center-mid" id="cell-center-sweet"><span>中央 (芯)</span></div>
+                  <div class="grid-cell" data-zone="heel-mid"><span>中・ヒール</span></div>
+                  
+                  <div class="grid-cell" data-zone="toe-bottom"><span>下・トウ</span></div>
+                  <div class="grid-cell" data-zone="center-bottom"><span>下・中央</span></div>
+                  <div class="grid-cell" data-zone="heel-bottom"><span>下・ヒール</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Curve input & Save panel -->
+          <div class="card impact-decision-card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-rotate"></i> スイング補正パラメータ</h3>
+            </div>
+            <div class="card-body">
+              <!-- Ball Shape (Slicing/Hooking) physical assistance selector -->
+              <div class="ball-shape-selector-container">
+                <span class="shape-title">実際の球筋 (ギア効果による打点逆算用)</span>
+                <p class="shape-desc">球筋を教えていただくことで、ギア効果に基づき打点位置の自動判定確度が大幅にアップします。</p>
+                
+                <div class="shape-buttons-grid">
+                  <button class="shape-btn" data-shape="hook">
+                    <i class="fa-solid fa-arrow-turn-up curve-hook"></i>
+                    <span>フック / ドロー</span>
+                  </button>
+                  <button class="shape-btn active" data-shape="straight">
+                    <i class="fa-solid fa-arrow-up"></i>
+                    <span>ストレート</span>
+                  </button>
+                  <button class="shape-btn" data-shape="slice">
+                    <i class="fa-solid fa-arrow-turn-up curve-slice"></i>
+                    <span>スライス / フェード</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Shot advisory generated by physical metrics -->
+              <div class="advisory-box">
+                <span class="adv-title"><i class="fa-solid fa-wand-magic-sparkles"></i> 打点分析アドバイス</span>
+                <p id="impact-advice-text">球筋と打点の組み合わせを決定すると、スイング改善のアドバイスが表示されます。</p>
+              </div>
+
+              <div class="impact-actions-group">
+                <button id="btn-save-shot" class="action-btn-large btn-save">
+                  <i class="fa-solid fa-floppy-disk"></i> このショットデータを記録
+                </button>
+                <button id="btn-share-shot" class="btn-sec-rect btn-share" disabled>
+                  <i class="fa-solid fa-share-nodes"></i> ショットを共有 (画像出力)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑤ HISTORY PANEL -->
+      <section id="panel-history" class="app-panel">
+        <div class="history-layout-grid">
+          <!-- History database list -->
+          <div class="card history-list-card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-folder-tree"></i> ショット履歴一覧</h3>
+              <button class="btn-clear-all" id="btn-db-clear-all"><i class="fa-solid fa-trash-can"></i> 全履歴消去</button>
+            </div>
+            <div class="card-body no-padding">
+              <div class="history-db-list" id="db-history-list">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Trend Chart analytics card -->
+          <div class="card history-chart-card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-chart-line"></i> データ推移・傾向分析</h3>
+              <div class="chart-selector-wrapper">
+                <select id="select-chart-metric" class="custom-select select-small">
+                  <option value="hs">ヘッドスピード</option>
+                  <option value="distance">飛距離</option>
+                  <option value="smash">ミート率</option>
+                  <option value="angle">打ち出し角</option>
+                </select>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="chart-canvas-wrapper">
+                <canvas id="trendChart" height="240"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑥ SETTINGS PANEL -->
+      <section id="panel-settings" class="app-panel">
+        <div class="card settings-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-sliders"></i> 各種設定・メタ情報</h3>
+          </div>
+          <div class="card-body">
+            
+            <!-- Unit conversions -->
+            <div class="setting-row">
+              <div class="set-info">
+                <span class="set-title">距離単位</span>
+                <span class="set-desc">飛距離表示の単位をヤードまたはメートルに切り替えます。</span>
+              </div>
+              <div class="set-control">
+                <select id="setting-unit-distance" class="custom-select select-medium">
+                  <option value="yd" selected>ヤード (yd)</option>
+                  <option value="m">メートル (m)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="set-info">
+                <span class="set-title">速度単位</span>
+                <span class="set-desc">ヘッドスピード表示の単位を m/s または km/h に切り替えます。</span>
+              </div>
+              <div class="set-control">
+                <select id="setting-unit-speed" class="custom-select select-medium">
+                  <option value="ms" selected>メートル/秒 (m/s)</option>
+                  <option value="kmh">キロメートル/時 (km/h)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Cloud backups Mockup -->
+            <div class="setting-row">
+              <div class="set-info">
+                <span class="set-title">ローカルデータのバックアップ</span>
+                <span class="set-desc">保存されたショット履歴をJSON形式でエクスポートまたは復元します。</span>
+              </div>
+              <div class="set-control-buttons">
+                <button class="btn-sec-rect" id="btn-export-data"><i class="fa-solid fa-file-export"></i> 書出</button>
+                <button class="btn-sec-rect" id="btn-import-data" onclick="document.getElementById('import-file-picker').click()"><i class="fa-solid fa-file-import"></i> 読込</button>
+                <input type="file" id="import-file-picker" accept=".json" class="hidden">
+              </div>
+            </div>
+
+            <!-- Application Info Panel -->
+            <div class="app-meta-details-box">
+              <h4><i class="fa-solid fa-cube"></i> アプリケーション作成情報</h4>
+              <div class="meta-detail-row">
+                <span>アプリケーション名:</span>
+                <strong>Golf Driver Analyzer</strong>
+              </div>
+              <div class="meta-detail-row">
+                <span>バージョン:</span>
+                <strong class="neon-badge-inline">v1.3-MVP</strong>
+              </div>
+              <div class="meta-detail-row">
+                <span>著者 / 開発者:</span>
+                <strong>ShoG & Antigravity (Google DeepMind Team)</strong>
+              </div>
+              <div class="meta-detail-row">
+                <span>作成日:</span>
+                <strong>2026年5月28日</strong>
+              </div>
+              <div class="meta-detail-row">
+                <span>想定初期動作要件:</span>
+                <strong>iPhone (Safari) / Android (Chrome) モバイルブラウザ推奨 (完全オフライン動作PWA)</strong>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Bottom App-Style Navigation Bar -->
+    <nav class="app-nav-bar">
+      <button class="nav-item active" data-target="home">
+        <i class="fa-solid fa-house"></i>
+        <span>ホーム</span>
+      </button>
+      <button class="nav-item" data-target="capture">
+        <i class="fa-solid fa-camera"></i>
+        <span>計測</span>
+      </button>
+      <button class="nav-item" data-target="history">
+        <i class="fa-solid fa-chart-line"></i>
+        <span>履歴/傾向</span>
+      </button>
+      <button class="nav-item" data-target="settings">
+        <i class="fa-solid fa-gears"></i>
+        <span>設定</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>

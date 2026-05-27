@@ -1,0 +1,5 @@
+# Custom headers for PWA Service Worker caching policy on Cloudflare Pages
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+/manifest.json
+  Cache-Control: no-cache, no-store, must-revalidate
